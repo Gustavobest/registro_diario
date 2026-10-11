@@ -383,7 +383,7 @@ $('pr').onclick=function(){clearInterval(pi);pi=null;pset(pm)};
 $('pk').onclick=function(){clearInterval(pi);pi=null;pset(pm==='f'?'b':'f')};
 function confetti(){if(matchMedia('(prefers-reduced-motion:reduce)').matches)return;var c=$('cf'),x=c.getContext('2d'),cl=['#3B4CCA','#E8A33D','#8C9BFF','#F0B455','#6BCB9D'],P=[],f=0;c.width=innerWidth;c.height=innerHeight;for(var i=0;i<90;i++)P.push({x:innerWidth/2,y:innerHeight/3,vx:(Math.random()-.5)*14,vy:Math.random()*-12-3,s:Math.random()*7+4,c:cl[i%5],r:Math.random()*6});(function fr(){x.clearRect(0,0,c.width,c.height);P.forEach(function(p){p.vy+=.35;p.x+=p.vx;p.y+=p.vy;p.r+=.2;x.fillStyle=p.c;x.save();x.translate(p.x,p.y);x.rotate(p.r);x.fillRect(-p.s/2,-p.s/2,p.s,p.s*.6);x.restore()});if(++f<110)requestAnimationFrame(fr);else x.clearRect(0,0,c.width,c.height)})()}
 function stag(){var g=$('grid');g.classList.add('st');setTimeout(function(){g.classList.remove('st')},900)}
-var hh=new Date().getHours();$('gr').textContent=(hh<12?'Buenos días':hh<19?'Buenas tardes':'Buenas noches')+'. Hoy es '+new Date().toLocaleDateString('es',{weekday:'long',day:'numeric',month:'long'})+'. Todo se guarda en este navegador.';
+var hh=new Date().getHours();$('gr').textContent=(hh<12?'Buenos días':hh<19?'Buenas tardes':'Buenas noches')+'. Hoy es '+new Date().toLocaleDateString('es',{weekday:'long',day:'numeric',month:'long'})+'. Tus datos se guardan en este navegador y, con una sesión activa, también en la nube, cifrados.';
 $('bkc').onclick=function(){var t=$('bk');t.value=JSON.stringify(S);t.select();try{document.execCommand('copy');$('bkm').textContent='Datos mostrados y copiados.'}catch(e){$('bkm').textContent='Copia el texto de arriba.'}};
 $('bkl').onclick=function(){try{var o=JSON.parse($('bk').value);if(!o||!o.habits)throw 0;S=o;S.marks=S.marks||{};S.notes=S.notes||{};S.pomo=S.pomo||{};S.hn=S.hn||{};S.cards=S.cards||{};S.learn=S.learn||[];S.improve=S.improve||[];save();grid();learn();imp();note();drawR();$('bk').value='';$('bkm').textContent='Datos cargados.'}catch(e){$('bkm').textContent='El texto no es una copia válida.'}};
 
@@ -399,7 +399,7 @@ function dec(t){var m=JSON.parse(t);return crypto.subtle.decrypt({name:'AES-GCM'
 function ref(){return db.collection('sesiones').doc(sH)}
 function fix(){S.marks=S.marks||{};S.notes=S.notes||{};S.pomo=S.pomo||{};S.hn=S.hn||{};S.cards=S.cards||{};S.learn=S.learn||[];S.improve=S.improve||[]}
 function ok(){say('Sincronizado · código '+sc)}
-function push(){if(!ckey||!db)return;enc({s:S,t:S._ts||0}).then(function(m){lastC=m;return ref().set({m:m,u:Date.now()})}).then(ok).catch(function(){say('Sin conexión: tus cambios se guardan aquí y se enviarán al volver.')})}
+function push(){if(!ckey||!db)return;if(!S._ts){S._ts=Date.now();store()}enc({s:S,t:S._ts||0}).then(function(m){lastC=m;return ref().set({m:m,u:Date.now()})}).then(ok).catch(function(){say('Sin conexión: tus cambios se guardan aquí y se enviarán al volver.')})}
 function bcast(){clearTimeout(bt);bt=setTimeout(push,500)}
 function recv(m){dec(m).then(function(o){if(!o||!o.s||!o.s.habits)return;var t=o.t||0,l=S._ts||0;if(t>l){try{localStorage.setItem(KEY+'-prev',JSON.stringify(S))}catch(e){}S=o.s;S._ts=t;fix();store();grid();learn();imp();note();drawR();ok()}else if(t<l)push();else ok()}).catch(function(){say('El código no coincide con los datos de esta sesión.')})}
 function stopSync(){if(unsub){unsub();unsub=null}ckey=null;sc=''}
