@@ -150,6 +150,10 @@ body:after{animation:drift 24s ease-in-out infinite reverse}
 <button class="go" id="addh">Añadir hábito</button>
 </div>
 <p class="sub" style="margin:0">Toca el nombre de un hábito para cambiarlo. El marco amarillo es hoy. Toca el número de un día para escribir un comentario; el punto amarillo marca los días con comentario y el símbolo ↻ un repaso programado (pasa el cursor para ver el tema).</p>
+<details style="margin-top:14px"><summary style="cursor:pointer;color:var(--mute)">Sincronizar mis dispositivos</summary>
+<p class="sub" style="margin:8px 0">Crea una sesión en un dispositivo y escribe el mismo código en el otro. Tus datos se guardan en la nube ya cifrados con ese código, así que ni el servicio puede leerlos. Funciona aunque un dispositivo esté apagado.</p>
+<div class="row"><button class="go" id="sn">Crear sesión</button><input type="text" id="sc" placeholder="Código de sesión" aria-label="Código de sesión" autocapitalize="off" autocomplete="off"><button class="go alt" id="sj">Unirme</button><button class="go alt" id="sx">Salir</button></div>
+<p class="sub" id="sy" style="margin:0">Sin sesión activa.</p></details>
 <details style="margin-top:14px"><summary style="cursor:pointer;color:var(--mute)">Copia de seguridad</summary>
 <p class="sub" style="margin:8px 0">Para pasar tus datos a otro navegador o dispositivo: pulsa "Mostrar mis datos", copia el texto, pégalo allá y pulsa "Cargar datos".</p>
 <textarea id="bk" aria-label="Datos" style="min-height:80px"></textarea>
@@ -204,6 +208,8 @@ body:after{animation:drift 24s ease-in-out infinite reverse}
 </main>
 
 <canvas id="cf"></canvas>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>
 (function(){
 var KEY='registro-diario-v1';
@@ -212,7 +218,8 @@ var S;
 try{var r=localStorage.getItem(KEY);S=r?JSON.parse(r):null}catch(e){S=null}
 if(!S||!S.habits){S=JSON.parse(JSON.stringify(DEF))}
 S.marks=S.marks||{};S.notes=S.notes||{};S.pomo=S.pomo||{};S.hn=S.hn||{};S.cards=S.cards||{};S.learn=S.learn||[];S.improve=S.improve||[];
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function store(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function save(){S._ts=Date.now();store();bcast()}
 function $(i){return document.getElementById(i)}
 function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function mk(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')}
@@ -379,7 +386,36 @@ function stag(){var g=$('grid');g.classList.add('st');setTimeout(function(){g.cl
 var hh=new Date().getHours();$('gr').textContent=(hh<12?'Buenos días':hh<19?'Buenas tardes':'Buenas noches')+'. Hoy es '+new Date().toLocaleDateString('es',{weekday:'long',day:'numeric',month:'long'})+'. Todo se guarda en este navegador.';
 $('bkc').onclick=function(){var t=$('bk');t.value=JSON.stringify(S);t.select();try{document.execCommand('copy');$('bkm').textContent='Datos mostrados y copiados.'}catch(e){$('bkm').textContent='Copia el texto de arriba.'}};
 $('bkl').onclick=function(){try{var o=JSON.parse($('bk').value);if(!o||!o.habits)throw 0;S=o;S.marks=S.marks||{};S.notes=S.notes||{};S.pomo=S.pomo||{};S.hn=S.hn||{};S.cards=S.cards||{};S.learn=S.learn||[];S.improve=S.improve||[];save();grid();learn();imp();note();drawR();$('bk').value='';$('bkm').textContent='Datos cargados.'}catch(e){$('bkm').textContent='El texto no es una copia válida.'}};
+
+
+var FB_CONFIG={apiKey:"AIzaSyDJqZakxEGqYECZa1p_QpbTYeE8hFjkQf0",authDomain:"registro-diario-cf8ee.firebaseapp.com",projectId:"registro-diario-cf8ee",storageBucket:"registro-diario-cf8ee.firebasestorage.app",messagingSenderId:"458342050109",appId:"1:458342050109:web:e0e79303168fe17677fd54"};
+var SK='rd-ses',ckey=null,sH='',sc='',db=null,unsub=null,bt=null,lastC='',jn=false;
+function say(m){$('sy').textContent=m}
+function b64(u){var t='';for(var i=0;i<u.length;i+=8192)t+=String.fromCharCode.apply(null,u.subarray(i,i+8192));return btoa(t)}
+function ub64(t){var q=atob(t),u=new Uint8Array(q.length);for(var i=0;i<q.length;i++)u[i]=q.charCodeAt(i);return u}
+function kdf(code){var e=new TextEncoder();return crypto.subtle.importKey('raw',e.encode(code),'PBKDF2',false,['deriveKey']).then(function(m){return crypto.subtle.deriveKey({name:'PBKDF2',salt:e.encode('registro-diario-v1'),iterations:100000,hash:'SHA-256'},m,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}).then(function(k){ckey=k;return crypto.subtle.digest('SHA-256',e.encode('id:'+code))}).then(function(h){sH=Array.from(new Uint8Array(h)).slice(0,16).map(function(x){return x.toString(16).padStart(2,'0')}).join('')})}
+function enc(o){var iv=crypto.getRandomValues(new Uint8Array(12));return crypto.subtle.encrypt({name:'AES-GCM',iv:iv},ckey,new TextEncoder().encode(JSON.stringify(o))).then(function(c){return JSON.stringify({i:b64(iv),d:b64(new Uint8Array(c))})})}
+function dec(t){var m=JSON.parse(t);return crypto.subtle.decrypt({name:'AES-GCM',iv:ub64(m.i)},ckey,ub64(m.d)).then(function(p){return JSON.parse(new TextDecoder().decode(p))})}
+function ref(){return db.collection('sesiones').doc(sH)}
+function fix(){S.marks=S.marks||{};S.notes=S.notes||{};S.pomo=S.pomo||{};S.hn=S.hn||{};S.cards=S.cards||{};S.learn=S.learn||[];S.improve=S.improve||[]}
+function ok(){say('Sincronizado · código '+sc)}
+function push(){if(!ckey||!db)return;enc({s:S,t:S._ts||0}).then(function(m){lastC=m;return ref().set({m:m,u:Date.now()})}).then(ok).catch(function(){say('Sin conexión: tus cambios se guardan aquí y se enviarán al volver.')})}
+function bcast(){clearTimeout(bt);bt=setTimeout(push,500)}
+function recv(m){dec(m).then(function(o){if(!o||!o.s||!o.s.habits)return;var t=o.t||0,l=S._ts||0;if(t>l){try{localStorage.setItem(KEY+'-prev',JSON.stringify(S))}catch(e){}S=o.s;S._ts=t;fix();store();grid();learn();imp();note();drawR();ok()}else if(t<l)push();else ok()}).catch(function(){say('El código no coincide con los datos de esta sesión.')})}
+function stopSync(){if(unsub){unsub();unsub=null}ckey=null;sc=''}
+function startSync(code){stopSync();
+  if(!FB_CONFIG.apiKey||!FB_CONFIG.projectId){say('Falta pegar la configuración de Firebase en el archivo (FB_CONFIG).');return}
+  if(typeof firebase==='undefined'||!window.crypto||!crypto.subtle){say('No se pudo cargar Firebase o falta https.');return}
+  sc=code;say('Conectando…');
+  kdf(code).then(function(){if(!firebase.apps.length)firebase.initializeApp(FB_CONFIG);db=firebase.firestore();
+    unsub=ref().onSnapshot(function(sn){if(!sn.exists){if(jn){say('No hay una sesión con ese código. Revisa que esté bien escrito.');return}push();return}jn=false;var d=sn.data();if(!d||!d.m||d.m===lastC)return;recv(d.m)},function(){say('Sin acceso a Firebase: revisa las reglas o la conexión.')})}).catch(function(){say('No se pudo iniciar el cifrado.')})}
+function newCode(){var A='abcdefghjkmnpqrstuvwxyz23456789',r=crypto.getRandomValues(new Uint8Array(12)),t='';for(var i=0;i<12;i++){t+=A[r[i]%A.length];if(i%4===3&&i<11)t+='-'}return t}
+function join(c){try{localStorage.setItem(SK,c)}catch(e){}startSync(c)}
+$('sn').onclick=function(){var c=newCode();$('sc').value=c;jn=false;join(c)};
+$('sj').onclick=function(){var c=$('sc').value.trim().toLowerCase();if(c.length>=14){jn=true;join(c)}else say('Escribe el código completo.')};
+$('sx').onclick=function(){stopSync();try{localStorage.removeItem(SK)}catch(e){}say('Sesión cerrada.')};
 grid();learn();imp();$('dd').value=iso(T);note();drawR();pset('f');stag();
+try{var c0=localStorage.getItem(SK);if(c0){$('sc').value=c0;startSync(c0)}}catch(e){}
 })();
 </script>
 </body>
